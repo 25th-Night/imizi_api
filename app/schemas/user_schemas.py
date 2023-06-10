@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import List
 
 
@@ -17,7 +17,7 @@ class APIKeysExtendRES(APIKeysRES):
 
 class UsersRES(BaseModel):
     id: int
-    email: str
+    email: EmailStr
     api_keys: List[APIKeysRES] = []
 
     class Config:
@@ -25,5 +25,5 @@ class UsersRES(BaseModel):
 
 
 class UsersREQ(BaseModel):
-    email: str
+    email: EmailStr
     pw: str
