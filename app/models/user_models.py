@@ -103,27 +103,11 @@ class APIKeys(Base):
         session.commit()
         return self
 
+
     @classmethod
-    def validate_signature(cls, access_key: str, ts: int, signature: str, session: Session):
+    def get_api_key(cls, access_key: str, session: Session):
         get_api_key = session.query(cls).filter_by(access_key=access_key, deleted_at=None).first()
-        reproduced_signature = hash_string(
-            {
-                "access_key": access_key,
-                "ts": ts,
-            },
-            get_api_key.secret_key,
-        )
-        if reproduced_signature != signature:
-            print("signature not match")
-            return False
-        if ts < int(get_current_timestamp()) - 500:
-            print(ts, int(get_current_timestamp()))
-            print("timestamp expired")
-            return False
-        if ts > int(get_current_timestamp()):
-            print("timestamp not valid")
-            return False
-        return True
+        return get_api_key
 
 
 class APIKeysWhitelist(Base):
