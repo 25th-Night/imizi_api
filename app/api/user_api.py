@@ -34,3 +34,13 @@ async def refresh_token(data: schemas.RefreshToken, session: Session = Depends(d
     print(f'refresh_payload["id"] : {refresh_payload["id"]}')
     u = session.query(models.Users).filter_by(id=refresh_payload["id"]).first()
     return u.token_refresh(data.refresh_token)
+
+
+@user.post("/api-keys", response_model=schemas.APIKeysExtendRES)
+async def create_api_key(user_id: int, session: Session = Depends(db.session)):
+    u = session.query(models.Users).filter_by(id=user_id).first()
+    if not u:
+        raise ValueError("존재하지 않는 유저입니다.")
+    api_key = models.APIKeys(user_id=user_id)
+    api_key.add(session)
+    return api_key
