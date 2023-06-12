@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: Optional[int] = 1
     DB_MAX_OVERFLOW: Optional[int] = 1
 
+    AWS_REGION = "ap-northeast-2"
+    AWS_BUCKET_NAME = os.getenv("AWS_BUCKET_NAME", "")
+    AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY", "")
+    AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY", "")
+
 
 class DevSettings(Settings):
     DB_URL = "mysql+pymysql://admin:1234@localhost:3306/imizi_api?charset=utf8mb4"
