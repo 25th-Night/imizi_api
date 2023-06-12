@@ -17,8 +17,9 @@ class AccessControl(BaseHTTPMiddleware):
             user = decode_token(request.state.access_token)
             if user:
                 request.state.user = models.Users.get(session, user.get("id"))
-        else:
-            raise ValueError("No Permission")
+        # 나중에는 토큰이 없으면 에러나도록 처리해야 함
+        # else:
+        #     raise ValueError("No Permission")
         ip = request.headers["x-forwarded-for"] if "x-forwarded-for" in request.headers.keys() else request.client.host
         request.state.ip = ip.split(",")[0] if "," in ip else ip
         response = await call_next(request)
