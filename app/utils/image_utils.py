@@ -1,6 +1,10 @@
 import base64
 from io import BytesIO
+
+import boto3
 from PIL import Image, UnidentifiedImageError
+
+from config import get_env
 
 
 def get_image_size(image):
@@ -12,13 +16,15 @@ def get_image_size(image):
 
 
 def resize_image(image, size):
+    print(f"type(image) : {type(image)}  111")
     image = Image.open(BytesIO(base64.b64decode(image)))
     width, height = image.size
     ratio = width / height
     image = image.resize((size, int(size / ratio)))
     buffered = BytesIO()
     image.save(buffered, format="WEBP")
-    return base64.b64encode(buffered.getvalue()).decode("utf-8"), len(buffered.getvalue())
+    print(f"type(image) : {type(image)}  222")
+    return image, len(buffered.getvalue())
 
 
 def get_squared_thumbnail(image):
@@ -39,7 +45,7 @@ def get_squared_thumbnail(image):
     image = image.resize((200, 200))
     buffered = BytesIO()
     image.save(buffered, format="WEBP")
-    return base64.b64encode(buffered.getvalue()).decode("utf-8"), len(buffered.getvalue())
+    return image, len(buffered.getvalue())
 
 
 def get_image_extension(image):
@@ -55,5 +61,25 @@ def get_image_mime(image):
 def get_image_file_size(image):
     image = Image.open(BytesIO(base64.b64decode(image)))
     buffered = BytesIO()
-    image.save(buffered)
+    image.save(buffered, format="WEBP")
     return len(buffered.getvalue())
+
+
+def s3_upload(image, file_name):
+    conf = get_env()
+    s3 = boto3.client(
+        "s3",
+        aws_access_key_id=conf.AWS_ACCESS_KEY,
+        aws_secret_access_key=conf.AWS_SECRET_KEY,
+        region_name=conf.AWS_REGION,
+    )
+    buffered = BytesIO()
+    image.save(buffered, format="WEBP")
+    s3.put_object(
+        Bucket=conf.AWS_BUCKET_NAME,
+        Key=f"{file_name}",
+        Body=buffered.getvalue(),
+        ACL="public-read",
+        ContentType="image/webp",
+    )
+    return f"https://{conf.AWS_BUCKET_NAME}.s3.{conf.AWS_REGION}.amazonaws.com/{file_name}"
