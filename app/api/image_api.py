@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends
+import asyncio
+import time
+
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 from uuid import uuid4
@@ -11,7 +14,7 @@ image = APIRouter()
 
 
 @image.post("/upload", response_model=schemas.ImageInfoRES)
-def upload_image(
+async def upload_image(
     request: Request,
     body: schemas.UploadImageREQ,
     image_group_id: int,
@@ -56,24 +59,24 @@ def upload_image(
     return image_model
 
 
-"""
-    있음 user_id = Column(ForeignKey("users.id"), nullable=False)
-    있음 image_group_id = Column(ForeignKey("images_groups.id"), nullable=False)
-    있음 uuid = Column(String(64), nullable=False, default=uuid.uuid4)
-    필요없는 모델 s3_key = Column(String(256), nullable=False)
-    있음 file_name = Column(String(128), nullable=False)
-    필요없는 모델 file_mime = Column(String(64), nullable=False)
-    있음 file_extension = Column(String(16), nullable=False)
-    필요없는 모델 file_size = Column(Integer, nullable=False)
-    있음 total_file_size = Column(Integer, nullable=False)
-    있음 image_url_data = Column(JSON, nullable=False)
-    image_group = relationship("ImageGroups", back_populates="images", uselist=False)
+@image.post("/bg-task", status_code=202)
+async def bg_task_test(
+    bg_task: BackgroundTasks,
+    session: Session = Depends(db.session),
+):
+    # background_task(session)
+    bg_task.add_task(background_task, session)
+    return {"message": "background task started"}
 
-"""
+
+def background_task(session):
+    time.sleep(5)
+    session.query(models.ImageGroups).update({models.ImageGroups.updated_at: "1999-01-05 00:00:00"})
+    session.commit()
 
 
 @image.get("/{image_id}", response_model=schemas.ImageInfoRES)
-def get_image(
+async def get_image(
     request: Request,
     image_id: int,
     session: Session = Depends(db.session),
