@@ -1,24 +1,35 @@
-from fastapi import APIRouter, Depends
+import asyncio
+import time
+
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 from uuid import uuid4
 from app import models, schemas
 from app.db.connection import db
 from app.depends.validate_api_key import validate_api_key
-from app.utils.image_utils import get_image_size, resize_image, get_image_extension, get_squared_thumbnail, s3_upload
+from app.utils.image_utils import (
+    get_image_size,
+    resize_image,
+    get_image_extension,
+    get_squared_thumbnail,
+    s3_upload,
+    s3_file_name,
+)
 
 image = APIRouter()
 
 
-@image.post("/upload", response_model=schemas.ImageInfoRES)
-def upload_image(
+@image.post("/upload", response_model=schemas.ImageInfoRES, status_code=202)
+async def upload_image(
     request: Request,
     body: schemas.UploadImageREQ,
+    bg_task: BackgroundTasks,
     image_group_id: int,
     session: Session = Depends(db.session),
     _=Depends(validate_api_key),
 ):
-
+    t = time.time()
     image_group = models.ImageGroups.get(session, request.state.user.id, image_group_id)
 
     if not image_group:
@@ -39,8 +50,14 @@ def upload_image(
             images[size] = resized_image
 
     image_detail = {}
+    image_to_save = {}
     for k, v in images.items():
-        image_detail[k] = s3_upload(v, f"{uuid}_{k}.webp", image_group)
+        image_detail[k] = s3_file_name(image_group, f"{uuid}_{k}.webp")
+        image_to_save[k] = {
+            "image": v,
+            "image_group_uuid": image_group.uuid,
+            "image_file_name": f"{uuid}_{k}.webp",
+        }
 
     image_model = models.Images()
     image_model.user_id = request.state.user.id
@@ -53,27 +70,35 @@ def upload_image(
     session.add(image_model)
     image_group.add_count()
     session.commit()
+    # background_s3_upload(image_to_save)
+    bg_task.add_task(background_s3_upload, image_to_save)
+    print("소요시간", time.time() - t)
     return image_model
 
 
-"""
-    있음 user_id = Column(ForeignKey("users.id"), nullable=False)
-    있음 image_group_id = Column(ForeignKey("images_groups.id"), nullable=False)
-    있음 uuid = Column(String(64), nullable=False, default=uuid.uuid4)
-    필요없는 모델 s3_key = Column(String(256), nullable=False)
-    있음 file_name = Column(String(128), nullable=False)
-    필요없는 모델 file_mime = Column(String(64), nullable=False)
-    있음 file_extension = Column(String(16), nullable=False)
-    필요없는 모델 file_size = Column(Integer, nullable=False)
-    있음 total_file_size = Column(Integer, nullable=False)
-    있음 image_url_data = Column(JSON, nullable=False)
-    image_group = relationship("ImageGroups", back_populates="images", uselist=False)
+def background_s3_upload(image_to_save):
+    for k, v in image_to_save.items():
+        s3_upload(v["image"], v["image_group_uuid"], v["image_file_name"])
 
-"""
+
+@image.post("/bg-task", status_code=202)
+async def bg_task_test(
+    bg_task: BackgroundTasks,
+    session: Session = Depends(db.session),
+):
+    # background_task(session)
+    bg_task.add_task(background_task, session)
+    return {"message": "background task started"}
+
+
+def background_task(session):
+    time.sleep(5)
+    session.query(models.ImageGroups).update({models.ImageGroups.updated_at: "1999-01-05 00:00:00"})
+    session.commit()
 
 
 @image.get("/{image_id}", response_model=schemas.ImageInfoRES)
-def get_image(
+async def get_image(
     request: Request,
     image_id: int,
     session: Session = Depends(db.session),
