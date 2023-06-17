@@ -4,6 +4,7 @@ from starlette.requests import Request
 
 from app import models
 from app.db.connection import db
+from app.models import Users
 from app.utils.auth_utils import get_current_timestamp, hash_string
 import asyncio
 
@@ -35,16 +36,12 @@ async def validate_api_key(request: Request, ts: int, access_key: str, signature
         api_key.secret_key,
     )
     if reproduced_signature != signature:
-        print("signature not match")
-        return False
+        raise ValueError("signature not match")
     if ts < int(get_current_timestamp()) - 5000:
-        print(ts, int(get_current_timestamp()))
-        print("timestamp expired")
-        return False
+        raise ValueError("timestamp expired")
     if ts > int(get_current_timestamp()):
-        print("timestamp not valid")
-        return False
-    return True
+        raise ValueError("timestamp not valid")
+    request.state.user = Users.get(id=api_key.user_id, session=session)
 
 async def validate_jwt_token():
     ...
